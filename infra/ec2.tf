@@ -18,16 +18,37 @@ resource "aws_instance" "ec2_instance" {
   user_data = <<EOF
 #!/bin/bash
 yum update -y
-yum install -y gcc-c++ make nodejs20
+yum install -y gcc-c++ make nodejs20 nginx
+
+cat > /etc/nginx/conf.d/node_app.conf << 'END'
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+END
+
+systemctl start nginx
+systemctl enable nginx
+
 echo "const http = require('http');
 const server = http.createServer((req, res) => {
   res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
-  res.end('Hello World\n');
+  res.setHeader('Content-Type', 'text/html');
+  res.end('<h1>Sistemas Distribuídos</h1>');
 });
 server.listen(3000, () => {
   console.log('Server running on port 3000');
 });" > /home/ec2-user/server.js
+
 nohup node-20 /home/ec2-user/server.js > /dev/null 2>&1 &
 EOF
 
